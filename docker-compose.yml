@@ -49,6 +49,8 @@ services:
       timeout: 15s
       retries: 5
       start_period: 3s
+    ports:
+      - "5432:5432"
     volumes:
       - taiga-db-data:/var/lib/postgresql/data
     networks:
@@ -156,12 +158,67 @@ services:
       - taiga-back
       - taiga-events
 
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:9  # Forgejo 是基于 Gitea 的
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - DB_TYPE=postgres
+      - DB_HOST=taiga-db:5432
+      - DB_NAME=taiga  # 与 Taiga 共享数据库
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWD=${POSTGRES_PASSWORD}
+      - APP_NAME=Forgejo
+      - RUN_MODE=prod
+      - ROOT_URL=http://localhost:3000  # Forgejo 的 URL
+    ports:
+      - "3000:3000"  # Forgejo 的默认端口
+    volumes:
+      - forgejo-data:/data  # 数据卷，用于持久化存储
+    depends_on:
+      - taiga-db
+    networks:
+      - taiga
+
+  flask-app:
+    build: ./webhook_flask
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./webhook_flask:/app
+    depends_on:
+      - forgejo
+      - taiga-db
+    networks:
+      - taiga
+    environment:
+      FLASK_ENV: development
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    ports:
+      - "4040:4040"  # Ngrok 控制台端口
+    environment:
+      NGROK_AUTHTOKEN: "${NGROK_AUTHTOKEN}"  # Ngrok 身份验证令牌
+    volumes:
+      - ./ngrok/ngrok.yml:/etc/ngrok.yml     # 将本地配置文件挂载到容器内
+    command:
+      - "start"
+      - "--all"
+      - "--config"
+      - "/etc/ngrok.yml"
+    depends_on:
+      - flask-app
+    networks:
+      - taiga
+
 volumes:
   taiga-static-data:
   taiga-media-data:
   taiga-db-data:
   taiga-async-rabbitmq-data:
   taiga-events-rabbitmq-data:
+  forgejo-data:
 
 networks:
   taiga:

@@ -1,0 +1,5 @@
+version: 2
+tunnels:
+  flask:
+    proto: http
+    addr: http://flask-app:5001
