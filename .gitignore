@@ -1,5 +1,4 @@
 db-data
 static-data
-./.env
 webhook_flask/.idea/
 .env.sensitive
